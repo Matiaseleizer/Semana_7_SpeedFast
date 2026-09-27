@@ -1,43 +1,62 @@
-# 🚀 SpeedFast - Sistema Multihilo y Sincronizado de Entregas (MVC + GUI Swing)
+# 🚀 SpeedFast - Sistema Multihilo y Persistencia con JDBC + MySQL (MVC + GUI Swing)
 
 ![Java](https://img.shields.io/badge/Java-17%2B-orange)
+![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-blue)
 ![IDE](https://img.shields.io/badge/IDE-IntelliJ%20IDEA-blue)
-![DuocUC](https://img.shields.io/badge/Evaluaci%C3%B3n-Sumativa%20Semana%206-003366)
+![DuocUC](https://img.shields.io/badge/Evaluaci%C3%B3n-Sumativa%20Semana%207-003366)
 
-Proyecto desarrollado para la asignatura **Desarrollo Orientado a Objetos II** de **Duoc UC Online** (Semana 6: *"Diseño de interfaces gráficas con Swing y patrón de arquitectura MVC"*).
+Proyecto desarrollado para la asignatura **Desarrollo Orientado a Objetos II** de **Duoc UC Online** (Semana 7: *"Persistencia de datos con JDBC y bases de datos relacionales"*).
 
-La aplicación evoluciona la simulación multihilo previa de **SpeedFast** hacia un entorno visual interactivo, implementando el patrón **Modelo-Vista-Controlador (MVC)**, autenticación con control de acceso por roles y una interfaz gráfica responsiva basada en **Java Swing**.
+La aplicación evoluciona el sistema de logística de **SpeedFast**, incorporando una capa de persistencia mediante **JDBC (Java Database Connectivity)** y **MySQL**, integrando el patrón **DAO (Data Access Object)** con el modelo concurrente multihilo y la interfaz gráfica en **Java Swing**.
 
 ---
 
-## 📋 Descripción del Caso (Semana 6)
+## 📋 Descripción del Caso (Semana 7)
 
-**SpeedFast** integra una capa de presentación visual que permite a los usuarios interactuar de forma intuitiva con el sistema de logística sin perder la potencia de la ejecución concurrente multihilo:
+**SpeedFast** consolida su arquitectura integrando persistencia relacional para garantizar que los pedidos, repartidores y entregas no se pierdan al cerrar la aplicación:
 
-* 🔐 **Autenticación y Roles:** Pantalla de inicio de sesión (`VentanaLogin`) que valida credenciales y restringe funciones según el rol (`Administrador` u `Operador`).
-* 📊 **Gestión Visual de Pedidos:** Tabla dinámica (`JTable` con `DefaultTableModel`) en la `VentanaGestionPedidos` que visualiza en tiempo real los elementos agregados a la `ZonaDeCarga`.
-* ⚡ **Ejecución Concurrente en GUI:** Integración de `ExecutorService` que ejecuta el proceso multihilo de reparto en segundo plano, evitando el congelamiento de la interfaz de usuario (*Event Dispatch Thread*).
+* 🗄️ **Persistencia en Base de Datos MySQL:** Creación y gestión de la base de datos `speedfast_db` con las tablas `pedido`, `repartidor` y `entrega`.
+* 🔌 **Conexión Robusta vía JDBC:** Implementación de la clase `ConexionDB` utilizando el driver de MySQL cargado desde la carpeta del proyecto (`lib/`).
+* 🧱 **Patrón DAO (Data Access Object):** Separación clara entre la lógica de acceso a datos y la interfaz mediante `PedidoDAO`, `RepartidorDAO` y `EntregaDAO`, haciendo uso de `PreparedStatement` y `ResultSet`.
+* 📊 **Sincronización con GUI (`JTable`):** Carga dinámica de los datos almacenados en MySQL al iniciar la `VentanaGestionPedidos` y almacenamiento automático de los nuevos registros creados desde el formulario.
+* ⚡ **Ejecución Concurrente Multihilo:** Mantenimiento de la simulación de reparto en segundo plano vía `ExecutorService` sin bloquear el hilo principal de eventos de la interfaz (*Event Dispatch Thread*).
 
 ---
 
 ## 🛠️ Conceptos y Tecnologías Aplicadas
 
-1. **Patrón de Arquitectura MVC (Modelo-Vista-Controlador):**
-    * **Modelo:** Clases de dominio (`Pedido`, `Usuario`, `ZonaDeCarga`, `Repartidor`, `EstadoPedido`, interfaces).
-    * **Controlador:** `ControladorUsuarios` (gestión de accesos) y `ControladorPedidos` (intermediario de datos y tabla).
-    * **Vista:** Formularios y ventanas gráficas desarrolladas en Java Swing.
-2. **Interfaz Gráfica de Usuario (Java Swing):** Uso de `JFrame`, `JTable`, `JComboBox`, `JTextField`, `JPasswordField` y gestores de diseño (`BorderLayout`, `GridLayout`, `FlowLayout`).
-3. **Control de Acceso y Roles:** Restricción de acciones en la GUI (el rol `Operador` registra pedidos, mientras que sólo `Administrador` puede disparar el reparto multihilo).
-4. **Programación Concurrente y Sincronización:** Recurso compartido seguro (`synchronized`) consumido por hilos `Runnable` administrados vía `ExecutorService` (`FixedThreadPool`).
-5. **POO Avanzada:** Aplicación de Abstracción, Herencia, Encapsulamiento, Polimorfismo e Interfaces (`Despachable`, `Cancelable`, `Rastreable`).
+1. **Persistencia de Datos y JDBC:**
+   * Conexión a servidor MySQL local mediante `DriverManager` y cadenas de conexión preparadas.
+   * Inclusión del driver `mysql-connector-j-*.jar` dentro de la carpeta `lib/` del proyecto.
+   * Ejecución segura de consultas SQL (`INSERT`, `SELECT`) utilizando `PreparedStatement` para prevenir inyecciones SQL y `ResultSet` para la lectura de registros.
+2. **Patrón de Diseño DAO (Data Access Object):**
+   * Encapsulamiento de las operaciones de lectura y escritura en la base de datos.
+   * Manejo de clases abstractas (como `Pedido`) instanciando subclases concretas dinámicamente al mapear los resultados SQL.
+3. **Patrón de Arquitectura MVC (Modelo-Vista-Controlador):**
+   * **Modelo:** Clases de dominio (`Pedido`, `Entrega`, `Repartidor`, `Usuario`, `ZonaDeCarga`, `EstadoPedido`, interfaces).
+   * **Acceso a Datos (DAO):** `ConexionDB`, `PedidoDAO`, `RepartidorDAO`, `EntregaDAO`.
+   * **Controlador:** `ControladorUsuarios` y `ControladorPedidos`.
+   * **Vista:** Formulario de inicio de sesión (`VentanaLogin`) y panel principal (`VentanaGestionPedidos`).
+4. **Interfaz Gráfica (Java Swing) y Concurrencia:**
+   * Uso de `JTable`, `DefaultTableModel`, `JComboBox`, `JTextField` y layouts.
+   * Coordinación de hilos `Runnable` con `ExecutorService` para la simulación sincronizada de entregas.
 
 ---
 
 ## 📁 Estructura del Proyecto
 
 ```text
-semana 6/
+semana 7/
+ ├── lib/
+ │    └── mysql-connector-j-8.x.x.jar # Driver JDBC de MySQL
+ │
  ├── src/
+ │    ├── dao/
+ │    │    ├── ConexionDB.java        # Gestión de conexión JDBC a speedfast_db
+ │    │    ├── PedidoDAO.java         # Operaciones CRUD para la tabla 'pedido'
+ │    │    ├── RepartidorDAO.java     # Operaciones CRUD para la tabla 'repartidor'
+ │    │    └── EntregaDAO.java        # Registro de entregas en la tabla 'entrega'
+ │    │
  │    ├── modelo/
  │    │    ├── Cancelable.java        # Interfaz para cancelación
  │    │    ├── Despachable.java       # Interfaz para despacho
@@ -48,19 +67,20 @@ semana 6/
  │    │    ├── PedidoEncomienda.java  # Subclase especializada
  │    │    ├── PedidoExpress.java     # Subclase especializada
  │    │    ├── PedidoEstandar.java    # Subclase concreta estándar
- │    │    ├── ZonaDeCarga.java       # Recurso compartido sincronizado
+ │    │    ├── Entrega.java           # Entidad del registro de entrega
  │    │    ├── Repartidor.java        # Tarea ejecutable (Runnable)
- │    │    └── Usuario.java           # Entidad de usuario y permisos
+ │    │    ├── Usuario.java           # Entidad de usuario y permisos
+ │    │    └── ZonaDeCarga.java       # Recurso compartido sincronizado
  │    │
  │    ├── controlador/
  │    │    ├── ControladorUsuarios.java # Lógica de autenticación
- │    │    └── ControladorPedidos.java  # Puente entre el modelo y la vista JTable
+ │    │    └── ControladorPedidos.java  # Intermediario de datos y zona de carga
  │    │
  │    ├── vista/
  │    │    ├── VentanaLogin.java           # Interfaz de inicio de sesión
- │    │    └── VentanaGestionPedidos.java  # Vista principal con JTable y formulario
+ │    │    └── VentanaGestionPedidos.java  # Vista principal con JTable y formulario JDBC
  │    │
- │    └── Main.java                   # Punto de entrada (SwingUtilities.invokeLater)
+ │    └── Main.java                   # Punto de entrada de la aplicación
  └── README.md                        # Documentación del proyecto
 
 ## ⚙️ Requisitos y Entorno de Ejecución
