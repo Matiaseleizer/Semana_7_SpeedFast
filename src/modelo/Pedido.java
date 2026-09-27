@@ -8,6 +8,7 @@ public abstract class Pedido {
     private int distanciaKm;
     protected String repartidor;
     private EstadoPedido estado;
+    private String tipo;
 
     //Constructor
     public Pedido(int idPedido, String direccionEntrega, int distanciaKm) {
@@ -71,12 +72,12 @@ public abstract class Pedido {
         this.repartidor = repartidor;
     }
 
-    public EstadoPedido getEstado() {
-        return estado;
-    }
+    public EstadoPedido getEstado() {return estado;}
 
     public void setEstado(EstadoPedido estado) {
         this.estado = estado;
     }
+
+    public String getTipo() {return tipo;}
 }
 

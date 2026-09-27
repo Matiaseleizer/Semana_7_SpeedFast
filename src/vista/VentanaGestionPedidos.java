@@ -1,6 +1,7 @@
 package vista;
 
 import controlador.ControladorPedidos;
+import dao.PedidoDAO;
 import modelo.*;
 
 import javax.swing.*;
@@ -8,6 +9,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +18,7 @@ public class VentanaGestionPedidos extends JFrame {
 
     private Usuario usuarioActual;
     private ControladorPedidos controladorPedidos;
+    private PedidoDAO pedidoDAO; // Instancia del DAO para interactuar con MySQL
 
     // Componentes del Formulario
     private JComboBox<String> cbTipoPedido;
@@ -34,6 +37,7 @@ public class VentanaGestionPedidos extends JFrame {
     public VentanaGestionPedidos(Usuario usuarioActual, ControladorPedidos controladorPedidos) {
         this.usuarioActual = usuarioActual;
         this.controladorPedidos = controladorPedidos;
+        this.pedidoDAO = new PedidoDAO(); // Inicialización del DAO
 
         // Configuración de la ventana principal
         setTitle("Verdulería al Paso - Gestión de Envíos | Usuario: " + usuarioActual.getNombreUsuario());
@@ -50,6 +54,9 @@ public class VentanaGestionPedidos extends JFrame {
 
         // Aplicar restricciones según el Rol
         aplicarPermisosPorRol();
+
+        // Cargar los pedidos existentes desde la base de datos MySQL
+        cargarPedidosDesdeBD();
     }
 
     private void inicializarEncabezado() {
@@ -126,11 +133,28 @@ public class VentanaGestionPedidos extends JFrame {
     }
 
     private void aplicarPermisosPorRol() {
-        // Ejemplo de control de acceso por rol:
-        // El rol "Operador" solo puede ingresar pedidos, pero no puede lanzar la simulación masiva
         if (usuarioActual.getRol().equalsIgnoreCase("Operador")) {
             btnIniciarReparto.setEnabled(false);
             btnIniciarReparto.setToolTipText("Requiere rol de Administrador para ejecutar el reparto.");
+        }
+    }
+
+    /**
+     * Consulta los registros almacenados en MySQL a través de PedidoDAO
+     * y llena la JTable con los resultados.
+     */
+    private void cargarPedidosDesdeBD() {
+        modelTabla.setRowCount(0); // Limpia la tabla actual
+        List<Pedido> pedidosBD = pedidoDAO.listarTodos();
+
+        for (Pedido p : pedidosBD) {
+            modelTabla.addRow(new Object[]{
+                    p.getIdPedido(),
+                    p.getTipo() != null ? p.getTipo() : "Estándar",
+                    p.getDireccionEntrega(),
+                    p.getDistanciaKm(),
+                    p.getEstado()
+            });
         }
     }
 
@@ -148,13 +172,23 @@ public class VentanaGestionPedidos extends JFrame {
             int distancia = Integer.parseInt(distanciaTexto);
             Pedido nuevoPedido = crearInstanciaPedido(tipoSeleccionado, contadorId++, direccion, distancia);
 
-            // Se registra mediante el controlador y se actualiza el JTable
-            controladorPedidos.agregarPedidoATabla(nuevoPedido, modelTabla);
+            // 1. Guardar el pedido en la base de datos MySQL mediante JDBC
+            boolean guardadoExitoso = pedidoDAO.guardar(nuevoPedido);
 
-            // Limpiar formulario
-            txtDireccion.setText("");
-            txtDistancia.setText("");
-            JOptionPane.showMessageDialog(this, "Pedido #" + nuevoPedido.getIdPedido() + " agregado con éxito.");
+            if (guardadoExitoso) {
+                // 2. Agregar al controlador en memoria
+                controladorPedidos.agregarPedidoATabla(nuevoPedido, modelTabla);
+
+                // 3. Recargar la JTable desde la BD para reflejar los datos actualizados
+                cargarPedidosDesdeBD();
+
+                // Limpiar formulario
+                txtDireccion.setText("");
+                txtDistancia.setText("");
+                JOptionPane.showMessageDialog(this, "Pedido agregado y guardado con éxito.");
+            } else {
+                JOptionPane.showMessageDialog(this, "Error al guardar el pedido en la base de datos.", "Error BD", JOptionPane.ERROR_MESSAGE);
+            }
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "La distancia debe ser un número entero válido.", "Error de formato", JOptionPane.ERROR_MESSAGE);
@@ -180,9 +214,8 @@ public class VentanaGestionPedidos extends JFrame {
             return;
         }
 
-        btnIniciarReparto.setEnabled(false); // Evitar múltiples ejecuciones simultáneas
+        btnIniciarReparto.setEnabled(false);
 
-        // Ejecutamos el reparto en un hilo secundario para NO congelar la interfaz gráfica (Swing EDT)
         new Thread(() -> {
             ExecutorService executor = Executors.newFixedThreadPool(3);
 
