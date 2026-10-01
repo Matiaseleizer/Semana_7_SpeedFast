@@ -1,7 +1,9 @@
 package vista;
 
 import controlador.ControladorPedidos;
+import dao.EntregaDAO;
 import dao.PedidoDAO;
+import dao.RepartidorDAO;
 import modelo.*;
 
 import javax.swing.*;
@@ -9,6 +11,9 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.sql.Date;
+import java.sql.SQLException;
+import java.sql.Time;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,45 +23,63 @@ public class VentanaGestionPedidos extends JFrame {
 
     private Usuario usuarioActual;
     private ControladorPedidos controladorPedidos;
-    private PedidoDAO pedidoDAO; // Instancia del DAO para interactuar con MySQL
 
-    // Componentes del Formulario
+    // DAOs
+    private PedidoDAO pedidoDAO;
+    private RepartidorDAO repartidorDAO;
+    private EntregaDAO entregaDAO;
+
+    // Pestaña Pedidos y Simulación
     private JComboBox<String> cbTipoPedido;
     private JTextField txtDireccion;
     private JTextField txtDistancia;
     private JButton btnAgregarPedido;
     private JButton btnIniciarReparto;
-
-    // Componentes de la Tabla
     private JTable tablaPedidos;
     private DefaultTableModel modelTabla;
 
-    // Contador secuencial para asignación automática de ID
+    // Pestaña Repartidores
+    private JTextField txtRepartidorNombre;
+    private JTable tablaRepartidores;
+    private DefaultTableModel modelRepartidores;
+
+    // Pestaña Entregas
+    private JComboBox<Pedido> cbEntregaPedido;
+    private JComboBox<Repartidor> cbEntregaRepartidor;
+    private JTextField txtFecha;
+    private JTextField txtHora;
+    private JTable tablaEntregas;
+    private DefaultTableModel modelEntregas;
+
     private int contadorId = 1;
 
     public VentanaGestionPedidos(Usuario usuarioActual, ControladorPedidos controladorPedidos) {
         this.usuarioActual = usuarioActual;
         this.controladorPedidos = controladorPedidos;
-        this.pedidoDAO = new PedidoDAO(); // Inicialización del DAO
 
-        // Configuración de la ventana principal
-        setTitle("Verdulería al Paso - Gestión de Envíos | Usuario: " + usuarioActual.getNombreUsuario());
-        setSize(750, 500);
+        // Inicializar DAOs
+        this.pedidoDAO = new PedidoDAO();
+        this.repartidorDAO = new RepartidorDAO();
+        this.entregaDAO = new EntregaDAO();
+
+        setTitle("SpeedFast - Gestión de Envíos | Usuario: " + usuarioActual.getNombreUsuario());
+        setSize(850, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
 
-        // Inicializar interfaz por componentes
         inicializarEncabezado();
-        inicializarFormulario();
-        inicializarTabla();
-        inicializarBotoneraAccion();
 
-        // Aplicar restricciones según el Rol
+        // Contenedor principal con pestañas
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.addTab("Pedidos & Simulación", crearPanelPedidosYSimulacion());
+        tabbedPane.addTab("Gestión Repartidores", crearPanelRepartidores());
+        tabbedPane.addTab("Registro Entregas", crearPanelEntregas());
+
+        add(tabbedPane, BorderLayout.CENTER);
+
         aplicarPermisosPorRol();
-
-        // Cargar los pedidos existentes desde la base de datos MySQL
-        cargarPedidosDesdeBD();
+        cargarDatosGenerales();
     }
 
     private void inicializarEncabezado() {
@@ -71,7 +94,11 @@ public class VentanaGestionPedidos extends JFrame {
         add(panelHeader, BorderLayout.NORTH);
     }
 
-    private void inicializarFormulario() {
+    // Panel de Pedidos y Simulación
+    private JPanel crearPanelPedidosYSimulacion() {
+        JPanel panelPrincipal = new JPanel(new BorderLayout(10, 10));
+
+        // Formulario
         JPanel panelForm = new JPanel(new GridLayout(4, 2, 8, 8));
         panelForm.setBorder(BorderFactory.createTitledBorder("Registrar Nuevo Pedido"));
 
@@ -88,37 +115,24 @@ public class VentanaGestionPedidos extends JFrame {
         panelForm.add(txtDistancia);
 
         btnAgregarPedido = new JButton("Agregar a Zona de Carga");
-        panelForm.add(new JLabel("")); // Espacio vacío para alinear el botón
+        panelForm.add(new JLabel(""));
         panelForm.add(btnAgregarPedido);
 
-        add(panelForm, BorderLayout.WEST);
+        btnAgregarPedido.addActionListener(e -> agregarPedido());
+        panelPrincipal.add(panelForm, BorderLayout.WEST);
 
-        // Evento para agregar pedido
-        btnAgregarPedido.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                agregarPedido();
-            }
-        });
-    }
-
-    private void inicializarTabla() {
+        // Tabla Pedidos
         String[] columnas = {"ID", "Tipo", "Dirección", "Distancia", "Estado"};
         modelTabla = new DefaultTableModel(columnas, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) {
-                return false; // Hace que la tabla no sea editable directamente
-            }
+            public boolean isCellEditable(int row, int column) { return false; }
         };
-
         tablaPedidos = new JTable(modelTabla);
         JScrollPane scrollPane = new JScrollPane(tablaPedidos);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Pedidos en Zona de Carga"));
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Pedidos en Zona de Carga / BD"));
+        panelPrincipal.add(scrollPane, BorderLayout.CENTER);
 
-        add(scrollPane, BorderLayout.CENTER);
-    }
-
-    private void inicializarBotoneraAccion() {
+        // Botón de Simulación
         JPanel panelSouth = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         btnIniciarReparto = new JButton("Iniciar Simulación de Reparto");
         btnIniciarReparto.setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -126,10 +140,147 @@ public class VentanaGestionPedidos extends JFrame {
         btnIniciarReparto.setForeground(Color.WHITE);
 
         panelSouth.add(btnIniciarReparto);
-        add(panelSouth, BorderLayout.SOUTH);
+        panelPrincipal.add(panelSouth, BorderLayout.SOUTH);
 
-        // Evento para iniciar la simulación multihilo
         btnIniciarReparto.addActionListener(e -> ejecutarSimulacionMultihilo());
+
+        return panelPrincipal;
+    }
+
+    // Panel de Repartidores
+    private JPanel crearPanelRepartidores() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        JPanel form = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        form.setBorder(BorderFactory.createTitledBorder("Registrar Repartidor"));
+
+        txtRepartidorNombre = new JTextField(15);
+        JButton btnGuardar = new JButton("Guardar");
+        JButton btnEliminar = new JButton("Eliminar");
+
+        form.add(new JLabel("Nombre:"));
+        form.add(txtRepartidorNombre);
+        form.add(btnGuardar);
+        form.add(btnEliminar);
+
+        modelRepartidores = new DefaultTableModel(new String[]{"ID", "Nombre"}, 0);
+        tablaRepartidores = new JTable(modelRepartidores);
+
+        btnGuardar.addActionListener(e -> {
+            String nombre = txtRepartidorNombre.getText().trim();
+            if (nombre.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Ingrese el nombre del repartidor.", "Validación", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            try {
+                repartidorDAO.guardar(new Repartidor(nombre));
+                JOptionPane.showMessageDialog(this, "Repartidor guardado correctamente.");
+                txtRepartidorNombre.setText("");
+                cargarDatosGenerales();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Error en BD: " + ex.getMessage(), "Error SQL", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        btnEliminar.addActionListener(e -> {
+            int row = tablaRepartidores.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Seleccione un repartidor para eliminar.", "Validación", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            int id = (int) modelRepartidores.getValueAt(row, 0);
+            try {
+                repartidorDAO.eliminar(id);
+                JOptionPane.showMessageDialog(this, "Repartidor eliminado.");
+                cargarDatosGenerales();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Error al eliminar: " + ex.getMessage(), "Error SQL", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        panel.add(form, BorderLayout.NORTH);
+        panel.add(new JScrollPane(tablaRepartidores), BorderLayout.CENTER);
+        return panel;
+    }
+
+    // Panel de Entregas (CRUD)
+    private JPanel crearPanelEntregas() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        JPanel form = new JPanel(new GridLayout(3, 2, 5, 5));
+        form.setBorder(BorderFactory.createTitledBorder("Registrar Entrega"));
+
+        cbEntregaPedido = new JComboBox<>();
+        cbEntregaRepartidor = new JComboBox<>();
+        txtFecha = new JTextField(10);
+        txtHora = new JTextField(8);
+
+        form.add(new JLabel("Pedido:"));
+        form.add(cbEntregaPedido);
+        form.add(new JLabel("Repartidor:"));
+        form.add(cbEntregaRepartidor);
+        form.add(new JLabel("Fecha (AAAA-MM-DD):"));
+        form.add(txtFecha);
+        form.add(new JLabel("Hora (HH:MM:SS):"));
+        form.add(txtHora);
+
+        JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnGuardarEntrega = new JButton("Guardar Entrega");
+        JButton btnEliminarEntrega = new JButton("Eliminar Entrega");
+        panelAcciones.add(btnGuardarEntrega);
+        panelAcciones.add(btnEliminarEntrega);
+
+        modelEntregas = new DefaultTableModel(new String[]{"ID", "ID Pedido", "ID Repartidor", "Fecha", "Hora"}, 0);
+        tablaEntregas = new JTable(modelEntregas);
+
+        btnGuardarEntrega.addActionListener(e -> {
+            Pedido p = (Pedido) cbEntregaPedido.getSelectedItem();
+            Repartidor r = (Repartidor) cbEntregaRepartidor.getSelectedItem();
+
+            if (p == null || r == null || txtFecha.getText().trim().isEmpty() || txtHora.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Todos los campos son requeridos.", "Validación", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            try {
+                Date fecha = Date.valueOf(txtFecha.getText().trim());
+                Time hora = Time.valueOf(txtHora.getText().trim());
+
+                Entrega entrega = new Entrega(p.getIdPedido(), r.getId(), fecha, hora);
+                entregaDAO.guardar(entrega);
+
+                JOptionPane.showMessageDialog(this, "Entrega registrada correctamente.");
+                txtFecha.setText("");
+                txtHora.setText("");
+                cargarDatosGenerales();
+            } catch (IllegalArgumentException ex) {
+                JOptionPane.showMessageDialog(this, "Formato fecha/hora inválido (Use AAAA-MM-DD y HH:MM:SS).", "Formato Incorrecto", JOptionPane.ERROR_MESSAGE);
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Error en BD: " + ex.getMessage(), "Error SQL", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        btnEliminarEntrega.addActionListener(e -> {
+            int row = tablaEntregas.getSelectedRow();
+            if (row == -1) {
+                JOptionPane.showMessageDialog(this, "Seleccione una entrega para eliminar.", "Validación", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            int id = (int) modelEntregas.getValueAt(row, 0);
+            try {
+                entregaDAO.eliminar(id);
+                JOptionPane.showMessageDialog(this, "Entrega eliminada.");
+                cargarDatosGenerales();
+            } catch (SQLException ex) {
+                JOptionPane.showMessageDialog(this, "Error al eliminar: " + ex.getMessage(), "Error SQL", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        JPanel panelSuperior = new JPanel(new BorderLayout());
+        panelSuperior.add(form, BorderLayout.CENTER);
+        panelSuperior.add(panelAcciones, BorderLayout.SOUTH);
+
+        panel.add(panelSuperior, BorderLayout.NORTH);
+        panel.add(new JScrollPane(tablaEntregas), BorderLayout.CENTER);
+        return panel;
     }
 
     private void aplicarPermisosPorRol() {
@@ -139,22 +290,47 @@ public class VentanaGestionPedidos extends JFrame {
         }
     }
 
-    /**
-     * Consulta los registros almacenados en MySQL a través de PedidoDAO
-     * y llena la JTable con los resultados.
-     */
-    private void cargarPedidosDesdeBD() {
-        modelTabla.setRowCount(0); // Limpia la tabla actual
-        List<Pedido> pedidosBD = pedidoDAO.listarTodos();
+    // Carga unificada de datos desde MySQL
+    private void cargarDatosGenerales() {
+        try {
+            // 1. Cargar Pedidos
+            modelTabla.setRowCount(0);
+            if (cbEntregaPedido != null) cbEntregaPedido.removeAllItems();
+            List<Pedido> pedidosBD = pedidoDAO.listarTodos();
 
-        for (Pedido p : pedidosBD) {
-            modelTabla.addRow(new Object[]{
-                    p.getIdPedido(),
-                    p.getTipo() != null ? p.getTipo() : "Estándar",
-                    p.getDireccionEntrega(),
-                    p.getDistanciaKm(),
-                    p.getEstado()
-            });
+            for (Pedido p : pedidosBD) {
+                modelTabla.addRow(new Object[]{
+                        p.getIdPedido(),
+                        p.getTipo() != null ? p.getTipo() : "Estándar",
+                        p.getDireccionEntrega(),
+                        p.getDistanciaKm(),
+                        p.getEstado()
+                });
+                if (cbEntregaPedido != null) cbEntregaPedido.addItem(p);
+            }
+
+            // 2. Cargar Repartidores
+            if (modelRepartidores != null) {
+                modelRepartidores.setRowCount(0);
+                cbEntregaRepartidor.removeAllItems();
+                List<Repartidor> repartidoresBD = repartidorDAO.listarTodos();
+                for (Repartidor r : repartidoresBD) {
+                    modelRepartidores.addRow(new Object[]{r.getId(), r.getNombre()});
+                    cbEntregaRepartidor.addItem(r);
+                }
+            }
+
+            // 3. Cargar Entregas
+            if (modelEntregas != null) {
+                modelEntregas.setRowCount(0);
+                List<Entrega> entregasBD = entregaDAO.listar();
+                for (Entrega e : entregasBD) {
+                    modelEntregas.addRow(new Object[]{e.getId(), e.getIdPedido(), e.getIdRepartidor(), e.getFecha(), e.getHora()});
+                }
+            }
+
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error al cargar datos desde MySQL: " + ex.getMessage(), "Error BD", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -172,17 +348,13 @@ public class VentanaGestionPedidos extends JFrame {
             int distancia = Integer.parseInt(distanciaTexto);
             Pedido nuevoPedido = crearInstanciaPedido(tipoSeleccionado, contadorId++, direccion, distancia);
 
-            // 1. Guardar el pedido en la base de datos MySQL mediante JDBC
+            // Guardar en MySQL
             boolean guardadoExitoso = pedidoDAO.guardar(nuevoPedido);
 
             if (guardadoExitoso) {
-                // 2. Agregar al controlador en memoria
                 controladorPedidos.agregarPedidoATabla(nuevoPedido, modelTabla);
+                cargarDatosGenerales();
 
-                // 3. Recargar la JTable desde la BD para reflejar los datos actualizados
-                cargarPedidosDesdeBD();
-
-                // Limpiar formulario
                 txtDireccion.setText("");
                 txtDistancia.setText("");
                 JOptionPane.showMessageDialog(this, "Pedido agregado y guardado con éxito.");
@@ -192,20 +364,31 @@ public class VentanaGestionPedidos extends JFrame {
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "La distancia debe ser un número entero válido.", "Error de formato", JOptionPane.ERROR_MESSAGE);
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this, "Error en la base de datos: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private Pedido crearInstanciaPedido(String tipo, int id, String direccion, int distancia) {
+        Pedido p;
         switch (tipo) {
             case "Comida":
-                return new PedidoComida(id, direccion, distancia);
+                p = new PedidoComida(id, direccion, distancia);
+                break;
             case "Encomienda":
-                return new PedidoEncomienda(id, direccion, distancia);
+                p = new PedidoEncomienda(id, direccion, distancia);
+                break;
             case "Express":
-                return new PedidoExpress(id, direccion, distancia);
+                p = new PedidoExpress(id, direccion, distancia);
+                break;
             default:
-                return new PedidoEstandar(id, direccion, distancia);
+                p = new PedidoEstandar(id, direccion, distancia);
+                break;
         }
+
+        p.setTipo(tipo.toUpperCase());
+
+        return p;
     }
 
     private void ejecutarSimulacionMultihilo() {

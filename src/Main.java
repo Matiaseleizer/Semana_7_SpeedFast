@@ -5,15 +5,22 @@ import vista.VentanaLogin;
 import javax.swing.*;
 
 public class Main {
-    public static void main(String[] args) {
-        // Ejecución segura de la GUI en el hilo de eventos de Swing
-        SwingUtilities.invokeLater(() -> {
-            ZonaDeCarga zonaDeCarga = new ZonaDeCarga();
-            ControladorUsuarios controladorUsuarios = new ControladorUsuarios();
 
-            // Iniciar la aplicación desde el Login
-            VentanaLogin login = new VentanaLogin(controladorUsuarios, zonaDeCarga);
-            login.setVisible(true);
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+        }
+
+        // Ejecutar la interfaz gráfica dentro del Event Dispatch Thread (EDT)
+        SwingUtilities.invokeLater(() -> {
+            // 1. Instanciar controladores y modelos
+            ControladorUsuarios controladorUsuarios = new ControladorUsuarios();
+            ZonaDeCarga zonaDeCarga = new ZonaDeCarga();
+
+            // 2. Instanciar y desplegar la ventana de Login
+            VentanaLogin ventanaLogin = new VentanaLogin(controladorUsuarios, zonaDeCarga);
+            ventanaLogin.setVisible(true);
         });
     }
 }

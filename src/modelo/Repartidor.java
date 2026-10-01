@@ -1,16 +1,23 @@
 package modelo;
 
-public class Repartidor implements Runnable{
+public class Repartidor implements Runnable {
 
     private String nombre;
     private ZonaDeCarga zonaDeCarga;
     private int id;
 
+    // AGREGADO: Constructor sencillo sin ZonaDeCarga (necesario para DAO y Swing)
+    public Repartidor(String nombre) {
+        this.nombre = nombre;
+    }
+
+    // Constructor completo con ZonaDeCarga (para la simulación con hilos)
     public Repartidor(String nombre, ZonaDeCarga zonaDeCarga) {
         this.nombre = nombre;
         this.zonaDeCarga = zonaDeCarga;
     }
 
+    // Getters y Setters
     public String getNombre() {
         return nombre;
     }
@@ -27,11 +34,28 @@ public class Repartidor implements Runnable{
         this.id = id;
     }
 
+    public ZonaDeCarga getZonaDeCarga() {
+        return zonaDeCarga;
+    }
+
+    public void setZonaDeCarga(ZonaDeCarga zonaDeCarga) {
+        this.zonaDeCarga = zonaDeCarga;
+    }
+
+    // AGREGADO: Formato legible para desplegables JComboBox en la interfaz Swing
+    @Override
+    public String toString() {
+        return (id > 0 ? id + " - " : "") + nombre;
+    }
+
     @Override
     public void run() {
-
         // Bucle dinámico: atiende la cola compartida mientras haya elementos
         while (true) {
+            if (zonaDeCarga == null) {
+                break;
+            }
+
             // Extracción sincronizada desde la modelo.ZonaDeCarga
             Pedido pedido = zonaDeCarga.retirarPedido();
 
@@ -65,5 +89,4 @@ public class Repartidor implements Runnable{
                     + " entregado con éxito (Estado: " + pedido.getEstado() + ").");
         }
     }
-
 }

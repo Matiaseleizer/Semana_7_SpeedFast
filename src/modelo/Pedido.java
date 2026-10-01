@@ -2,7 +2,7 @@ package modelo;
 
 public abstract class Pedido {
 
-    //Atributos
+    // Atributos
     private int idPedido;
     private String direccionEntrega;
     private int distanciaKm;
@@ -10,17 +10,16 @@ public abstract class Pedido {
     private EstadoPedido estado;
     private String tipo;
 
-    //Constructor
+    // Constructor
     public Pedido(int idPedido, String direccionEntrega, int distanciaKm) {
         this.idPedido = idPedido;
         this.direccionEntrega = direccionEntrega;
         this.distanciaKm = distanciaKm;
         this.estado = EstadoPedido.PENDIENTE;
-
     }
 
-    //Metodo
-    public void mostrarResumen(){
+    // Métodos de consola
+    public void mostrarResumen() {
         System.out.println("---N° pedido #: " + idPedido);
         System.out.println("---Dirección de entrega: " + direccionEntrega);
         System.out.println("---Distancia (KM): " + distanciaKm);
@@ -28,18 +27,17 @@ public abstract class Pedido {
         System.out.println("---Estado: " + estado);
     }
 
-    //Metodos
-    public void asignarRepartidor(){
+    public void asignarRepartidor() {
         this.repartidor = "modelo.Repartidor estándar";
     }
 
-    protected abstract int calcularTiempoEntrega(); //Metodo Abstracto
+    protected abstract int calcularTiempoEntrega(); // Método Abstracto
 
-    private void tipoDeEntrega(){}
+    private void tipoDeEntrega() {}
 
-    private void factoresQueAfectanDuracion(){}
+    private void factoresQueAfectanDuracion() {}
 
-    //Getter & Setter
+    // Getters & Setters
     public int getIdPedido() {
         return idPedido;
     }
@@ -72,12 +70,26 @@ public abstract class Pedido {
         this.repartidor = repartidor;
     }
 
-    public EstadoPedido getEstado() {return estado;}
+    public EstadoPedido getEstado() {
+        return estado;
+    }
 
     public void setEstado(EstadoPedido estado) {
         this.estado = estado;
     }
 
-    public String getTipo() {return tipo;}
-}
+    public String getTipo() {
+        return tipo;
+    }
 
+    // AGREGADO: Necesario para que PedidoDAO y la vista puedan asignar el tipo de pedido
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
+
+    // AGREGADO: Necesario para que el JComboBox en Swing muestre el pedido de forma entendible
+    @Override
+    public String toString() {
+        return idPedido + " - " + (direccionEntrega != null ? direccionEntrega : "Sin dirección");
+    }
+}
